@@ -1,0 +1,82 @@
+#!/bin/ash
+
+# This script will:
+# - Use a custom routing table using 192.168.1.1 as default gateway - modify this if your upstream router does not have this private IP address.
+# - Allow LAN access, so this peer can be accessed remotely from an ingress server for management purposes - this could be insecure if we do not trust the VPN environment.
+# - Establish a root password (in plain text) - consider changing the password.
+# - Push only some traffic through the VPN tunnel (split-tunnelling).
+
+uci delete dhcp.@dnsmasq[0].address
+uci delete firewall.@redirect[0]
+uci delete firewall.@redirect[0]
+uci delete firewall.@redirect[0]
+uci set firewall.@zone[1].masq='1'
+uci set oui-httpd.main.security_rule='0'
+uci set glconfig.general.autotimezone='1'
+uci set oui-httpd.main.lang='en'
+uci set oui-httpd.main.inited='1'
+uci set vpnpolicy.route_policy.proxy_mode='2'
+uci commit
+
+/etc/init.d/dnsmasq restart
+
+echo "root:s3curep4ssw0rd"|chpasswd
+
+cat << EOF > /etc/config/wireguard
+config proxy 'global'
+        option global_proxy '1'
+
+config groups 'group_9543'
+        option group_type '2'
+        option auth_type '0'
+        option group_name 'group_name'
+
+config peers 'peer_3219'
+        option group_id '9543'
+        option name 'tunnel_name'
+        option persistent_keepalive '25'
+        option listen_port '59300'
+        option dns '8.8.8.8'
+        option ipv6_enable '0'
+        option presharedkey_enable '1'
+        option masq '1'
+        option local_access '1'
+        option default_metric '0'
+        option address_v4 '10.10.10.99/32'
+        option private_key 'interface_private_key='
+        option public_key 'peer_public_key='
+        option end_point 'our.desired.endpoint:51820'
+        option allowed_ips '10.10.10.0/24'
+        option preshared_key 'psk='
+
+config route_rules 'rule_2528'
+        option peer_id '3219'
+        option route_flag '4'
+        option mask '24'
+        option metric '0'
+        option scope 'link'
+        option dest '10.10.10.0'
+        option gateway '10.10.10.99'
+
+config route_rules 'rule_8284'
+        option peer_id '3219'
+        option route_flag '4'
+        option dest '0.0.0.0'
+        option mask '0'
+        option gateway '192.168.1.1'
+        option metric '0'
+        option scope 'link'
+EOF
+
+
+cat << EOF >> /etc/config/network
+
+config interface 'wgclient'
+        option proto 'wgclient'
+        option config 'peer_3219'
+        option disabled '0'
+EOF
+
+sleep 5
+
+reboot
