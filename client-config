@@ -8,21 +8,22 @@
 
 
 uci delete dhcp.@dnsmasq[0].address
-uci delete firewall.@redirect[0]
-uci delete firewall.@redirect[0]
-uci delete firewall.@redirect[0]
+uci delete firewall.@redirect[0] # Deleting firewall rules which capture traffic when device is not initialised.
+uci delete firewall.@redirect[0] # This is repeated on purpose, as @redirect[1] now becomes @redirect[0] after running the previous command.
+uci delete firewall.@redirect[0] # This is repeated on purpose, as @redirect[2] became @redirect[1] after running the first delete command, and then it became @redirect[0] after running the previous command.
 uci set firewall.@zone[1].masq='1'
 uci set oui-httpd.main.security_rule='0'
 uci set glconfig.general.autotimezone='1'
-uci set oui-httpd.main.lang='en'
-uci set oui-httpd.main.inited='1'
-uci set vpnpolicy.global.kill_switch='1'
+uci set oui-httpd.main.lang='en' # Setting language to English.
+uci set oui-httpd.main.inited='1' # Setting device to initialised.
+uci set vpnpolicy.global.kill_switch='1' # Enabling killswitch.
 uci commit
 
 /etc/init.d/dnsmasq restart
 
-echo "root:s3curep4ssw0rd"|chpasswd
+echo "root:s3curep4ssw0rd"|chpasswd # Changing root password. Make sure you change the password after doing the reboot with passwd command, so it is not plain text and not recorded in history.
 
+# This will overwrite /etc/config/wireguard file, which comes with some entries related to commercial VPN providers.
 cat << EOF > /etc/config/wireguard
 config proxy 'global'
         option global_proxy '1'
@@ -50,7 +51,7 @@ config peers 'peer_3219'
         option default_metric '0'
 EOF
 
-
+# This will add the relevant WireGuard interface in the network list, and we enable it so it auto-connects upon reboot.
 cat << EOF >> /etc/config/network
 
 config interface 'wgclient'
