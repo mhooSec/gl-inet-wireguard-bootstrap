@@ -1,0 +1,64 @@
+#!/bin/ash
+
+# This script will:
+# - Enable killswitch, so Internet connectivity will be broken if gateway within the VPN tunnel is unavailable.
+# - Allow LAN access, so this peer can be accessed remotely from an ingress server for management purposes - this could be insecure if we do not trust the VPN environment.
+# - Establish a root password (in plain text) - consider changing the password.
+# - Push all traffic through the VPN tunnel
+
+
+uci delete dhcp.@dnsmasq[0].address
+uci delete firewall.@redirect[0]
+uci delete firewall.@redirect[0]
+uci delete firewall.@redirect[0]
+uci set firewall.@zone[1].masq='1'
+uci set oui-httpd.main.security_rule='0'
+uci set glconfig.general.autotimezone='1'
+uci set oui-httpd.main.lang='en'
+uci set oui-httpd.main.inited='1'
+uci set vpnpolicy.global.kill_switch='1'
+uci commit
+
+/etc/init.d/dnsmasq restart
+
+echo "root:s3curep4ssw0rd"|chpasswd
+
+cat << EOF > /etc/config/wireguard
+config proxy 'global'
+        option global_proxy '1'
+
+config groups 'group_1026'
+        option group_type '2'
+        option auth_type '0'
+        option group_name 'group_name'
+
+config peers 'peer_3219'
+        option group_id '1026'
+        option name 'tunnel_name'
+        option persistent_keepalive '25'
+        option address_v4 '10.10.10.15/32'
+        option private_key 'interface_privatekey='
+        option public_key 'peer_publickey='
+        option end_point 'our.desired.endpoint:51820'
+        option allowed_ips '0.0.0.0/0'
+        option dns '8.8.8.8, 1.1.1.1'
+        option ipv6_enable '0'
+        option presharedkey_enable '1'
+        option preshared_key 'psk='
+        option masq '1'
+        option local_access '1'
+        option default_metric '0'
+EOF
+
+
+cat << EOF >> /etc/config/network
+
+config interface 'wgclient'
+        option proto 'wgclient'
+        option config 'peer_3219'
+        option disabled '0'
+EOF
+
+sleep 5
+
+reboot
